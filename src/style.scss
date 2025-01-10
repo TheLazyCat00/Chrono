@@ -1,0 +1,43 @@
+*{
+	margin: 0;
+	padding: 0;
+	min-width: 0;
+	min-height: 0;
+	box-sizing: border-box;
+	font-family: Arial, Helvetica, sans-serif;
+	border: none;
+	outline: none;
+	font-size: 0.45cm;
+	color: hsl(0, 0%, 100%);
+}
+
+html{
+	background-color: black;
+	overflow: hidden;
+}
+
+button{
+	user-select: none;
+}
+
+button:hover{
+	cursor: pointer;
+}
+
+::-webkit-scrollbar{
+    width: 0.04cm;
+    height: 0.04cm;
+    margin: 0;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgb(111, 111, 111);
+}
+
+::-webkit-scrollbar-track {
+    display: none;
+}
+
+::-webkit-scrollbar-button {
+    display: none;
+}
