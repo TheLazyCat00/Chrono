@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { ipcMain } from 'electron'
+import fs from 'fs';
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -48,6 +49,27 @@ function createWindow() {
 	});
 }
 
+const chronoDirPath = path.join(
+	process.env.LOCALAPPDATA || process.env.APPDATA || `${process.env.HOME}/.local/share`,
+	'Chrono'
+);
+
+const appDataPath = path.join(chronoDirPath, 'storage.json');
+
+if (!fs.existsSync(chronoDirPath)) {
+	fs.mkdirSync(chronoDirPath, { recursive: true });
+}
+
+if (!fs.existsSync(appDataPath)) {
+	fs.writeFileSync(appDataPath, ""); // Create an empty JSON file
+}
+
+let content = fs.readFileSync(appDataPath, 'utf-8');
+if(content == ""){
+	fs.writeFileSync(appDataPath, JSON.stringify({}, null, 2));
+}
+
+
 function setIpc(win){
 	ipcMain.on("closeApp", () => {
 		app.quit();
@@ -73,12 +95,26 @@ function setIpc(win){
 		dialog.showOpenDialog({
 			properties: ['openFile']
 		}).then(result => {
-			if (!result.canceled) {
-				win.webContents.send('selected-file', result.filePaths[0]);
-			}
-		}).catch(err => {
-			console.log(err);
-		});
+				if (!result.canceled) {
+					win.webContents.send('selected-file', result.filePaths[0]);
+				}
+			}).catch(err => {
+				console.log(err);
+			});
+	});
+	ipcMain.on('read-storage', () => {
+		let data;
+		if (!fs.existsSync(appDataPath)) {
+			data = {};
+		}
+		else{
+			data = fs.readFileSync(appDataPath, 'utf-8');
+			data = JSON.parse(data);
+		}
+		win.webContents.send("read-storage-reply", data);
+	});
+	ipcMain.on('write-storage', (event, data) => {
+		fs.writeFileSync(appDataPath, JSON.stringify(data, null, "\t"))
 	});
 }
 

@@ -125,6 +125,7 @@ $lightgrey: hsla(0, 0%, 58%, 0.2);
 }
 
 .textTest {
+	width: 20cm;
 	visibility: hidden;
 	position: absolute;
 	padding: 0;
@@ -239,9 +240,10 @@ $lightgrey: hsla(0, 0%, 58%, 0.2);
 </style>
 
 <script lang="ts" setup>
-import { onMounted, Ref, ref } from 'vue';
+import { nextTick, onMounted, Ref, ref } from 'vue';
 import { useDragAndDrop } from '@formkit/drag-and-drop/vue';
 import { animations } from '@formkit/drag-and-drop';
+import * as storage from "../storage.ts";
 
 const props = defineProps({
 	color: String,
@@ -257,14 +259,24 @@ const textTest: Ref<HTMLParagraphElement> = ref(null);
 const rightPanel: Ref<HTMLDivElement> = ref(null);
 const bottomRange: Ref<HTMLDivElement> = ref(null);
 const items: Ref<Array<HTMLDivElement>> = ref(null);
-const [normalTasks, tasks]: any = useDragAndDrop(JSON.parse(localStorage.getItem(getKeyString())) || [], {
-	dragHandle: ".dragElement",
-	plugins: [animations({ duration: 80 })],
-	draggingClass: "beingDragged",
-});
-const allConditionTasks: Array<object | any> = JSON.parse(localStorage.getItem("conditionTasks") || "[]");
+
 const shownConditionTasks: Ref<Array<object | any>> = ref([]);
-updateShownConditionTasks();
+
+let normalTasks;
+let tasks = ref([]);
+let allConditionTasks: Array<object | any>;
+
+storage.get(getKeyString()).then((data) => {
+	[normalTasks, tasks] = useDragAndDrop(data, {
+		dragHandle: ".dragElement",
+		plugins: [animations({ duration: 80 })],
+		draggingClass: "beingDragged",
+	});
+});
+storage.get("conditionTasks").then((data) => {
+	allConditionTasks = data;
+	updateShownConditionTasks();
+});
 
 let pressedControl: boolean;
 let height: Ref<Number> = ref(undefined);
@@ -275,6 +287,12 @@ function getKeyString() {
 
 function changeTextAreaHeight() {
 	textTest.value.style.width = textArea.value.offsetWidth + "px";
+	textTest.value.innerText = textArea.value.value + "WWWWWWWWWWWW";
+
+	height.value = textTest.value.offsetHeight;
+}
+
+function initTextAreaHeight() {
 	textTest.value.innerText = textArea.value.value + "WWWWWWWWWWWW";
 
 	height.value = textTest.value.offsetHeight;
@@ -382,13 +400,13 @@ function submitText() {
 	updateRightBar();
 }
 
-function saveState() {
-	localStorage.setItem("conditionTasks", JSON.stringify(allConditionTasks));
+async function saveState() {
+	await storage.set("conditionTasks", allConditionTasks);
 	if (tasks.value.length == 0) {
-		localStorage.removeItem(getKeyString());
+		await storage.remove(getKeyString());
 		return;
 	}
-	localStorage.setItem(getKeyString(), JSON.stringify(tasks.value))
+	await storage.set(getKeyString(), tasks.value);
 }
 
 function focusTextArea() {
@@ -460,12 +478,13 @@ function hasFile() {
 
 onMounted(() => {
 	updateRightBar();
-	setTimeout(changeTextAreaHeight, 100);
 });
 
 window.onresize = changeTextAreaHeight;
 
-window.onbeforeunload = saveState;
+onMounted(() => {
+	nextTick().then(initTextAreaHeight);
+});
 
 defineExpose({
 	focusTextArea,

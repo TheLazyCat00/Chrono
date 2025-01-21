@@ -164,6 +164,7 @@ $height: 5cm;
 <script lang="ts" setup>
 import { onMounted, ref, Ref } from 'vue';
 import { eventBus, globalState } from '../state';
+import * as storage from "../storage.ts";
 
 const props = defineProps({
 	color: String,
@@ -183,7 +184,7 @@ let opacity: Ref<Number> = ref(0);
 let width: Ref<Number> = ref(0);
 const animationDuration = 0.3;
 
-const tasks = ref(getTasks());
+let tasks = ref([]);
 
 function matchPattern(date, rules) {
 	const weekday = (date.getDay() + 6) % 7 + 1;
@@ -202,19 +203,22 @@ function matchPattern(date, rules) {
 	}
 }
 
-function getConditionTasks() {
-	let conditionTasks = [];
-	for (let object of JSON.parse(localStorage.getItem("conditionTasks") || "[]")) {
+async function getConditionTasks() {
+	const data = await storage.get("conditionTasks");
+	const conditionTasks = [];
+
+	for (let object of data) {
 		if (matchPattern(props.date, object.condition)) {
 			conditionTasks.push(object);
 		}
 	}
+
 	return conditionTasks;
 }
 
-function getTasks() {
-	let normalTasks = JSON.parse(localStorage.getItem(getKeyString()) || "[]");
-	let conditionTasks = getConditionTasks();
+async function getTasks() {
+	const normalTasks = await storage.get(getKeyString());
+	const conditionTasks = await getConditionTasks();
 	return [...normalTasks, ...conditionTasks];
 }
 
@@ -260,11 +264,11 @@ function openMenu() {
 	}, animationDuration * 1000);
 }
 
-function closeMenu() {
+async function closeMenu() {
 	globalState.dayOpen = false;
 
-	dayCardMenu.value.saveState();
-	tasks.value = JSON.parse(localStorage.getItem(getKeyString()) || "[]");
+	await dayCardMenu.value.saveState();
+	tasks.value = await getTasks()
 	let initPos = { x: menuIcon.value.offsetLeft, y: menuIcon.value.offsetTop };
 	let initSize = { x: menuIcon.value.offsetWidth, y: menuIcon.value.offsetHeight };
 
@@ -310,20 +314,25 @@ function updateBottomBar() {
 			tasksDone++;
 		}
 	}
-	width.value = tasksDone / tasks.value.length * 100;
+	width.value = tasksDone/tasks.value.length * 100;
 }
 
-function updatePreview() {
-	tasks.value = getTasks();
+async function updatePreview() {
+	tasks.value = await getTasks();
 	updateBottomBar();
 }
 
-onMounted(updateBottomBar);
+onMounted(() => {
+	getTasks().then(tasks1 => {
+		tasks.value = tasks1;
+		updateBottomBar();
+	});
+});
 
 document.addEventListener("keydown", (event) => {
 	if (event.key == "Escape") {
-		closeMenu()
-	}
-})
-eventBus.on("updatePreview", updatePreview);
+		closeMenu();
+	};
+});
+eventBus.on("updatePreview", updatePreview)
 </script>

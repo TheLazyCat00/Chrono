@@ -1,5 +1,6 @@
 import { ipcRenderer, contextBridge } from 'electron'
-
+// Inside the renderer process
+ipcRenderer.setMaxListeners(50);  // Increase the limit to 20 listeners
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
 	on(...args: Parameters<typeof ipcRenderer.on>) {
@@ -34,7 +35,15 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 			});
 		});
 	},
-
+	read: () => {
+		return new Promise((resolve) => {
+			ipcRenderer.once("read-storage-reply", (_, data) => {
+				resolve(data);
+			});
+			ipcRenderer.send("read-storage");
+		});
+	},
+	write: (data) => ipcRenderer.send('write-storage', data),
 	// You can expose other APTs you need here.
 	// ...
 });

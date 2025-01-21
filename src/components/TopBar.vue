@@ -1,6 +1,9 @@
 <template>
 	<div class="content1" ref="content">
-		<div class="buffer"></div>
+		<div class="leftButtons buttons">
+			<button @click="copy()" :style="`background-color: ${copyColor};`" class="copy"><img src="../assets/copy.png" draggable="false"></button>
+			<button @click="merge()" class="copy"><img src="../assets/merge.png" draggable="false"></button>
+		</div>
 		<div class="drag"></div>
 		<div class="buttons">
 			<button @click="minimizeApp()"><div class="line"></div></button>
@@ -9,6 +12,13 @@
 		</div>
 	</div>
 	<div ref="smallbar" class="smallbar" @mouseenter="show()"></div>
+	<div class="mergePreview" v-if="renderPreview">
+		<textarea ref="textPreview" spellcheck="false" wrap="off"></textarea>
+		<div class="previewButtons">
+			<button class="accept" @click="accept()">Accept</button>
+			<button class="cancel" @click="cancel()">Cancel</button>
+		</div>
+	</div>
 </template>
 
 <style lang="scss" scoped>
@@ -46,6 +56,10 @@ $background: hsl(33, 52%, 33%);
 	justify-content: center;
 	align-items: center;
 	height: 100%;
+	width: 4cm;
+}
+
+.leftButtons{
 	width: 4cm;
 }
 
@@ -92,10 +106,144 @@ $background: hsl(33, 52%, 33%);
 	height: 100%;
 	width: 2cm;
 }
+
+.copy{
+	width: 100%;
+	height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 0.1cm;
+}
+
+.copy > img{
+	height: 100%;
+	aspect-ratio: 1;
+}
+
+.mergePreview{
+	position: absolute;
+	z-index: 10;
+	background-color: black;
+	border: solid grey 0.1cm;
+	border-radius: 0.4cm;
+	top: calc(-100vh + 1cm);
+	left: 1cm;
+	height: calc(100vh - 1cm);
+	width: calc(100vw - 2cm);
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	gap: 0.3cm;
+	padding: 0.3cm;
+	overflow: hidden;
+	animation: fadeIn 1s forwards;
+}
+
+.mergePreview > textarea{
+	background-color: darkslategrey;
+	width: 100%;
+	height: 100%;
+	resize: none;
+	border-radius: 0.2cm;
+	padding: 0.1cm;
+	font-family: monospace;
+}
+
+.previewButtons{
+	width: 100%;
+	display: flex;
+	justify-content: right;
+	gap: 0.3cm;
+}
+
+.previewButtons > button{
+	padding: 0.2cm;
+	background-color: blue;
+	border-radius: 0.2cm;
+}
+
+.previewButtons > button:hover{
+	background-color: darken(blue, 20%);
+}
+
+.cancel{
+	background-color: dimgrey !important;
+}
+
+.cancel:hover{
+	background-color: darken(dimgrey, 20%) !important;
+}
+
+@keyframes fadeIn {
+	from {
+		top: calc(-100vh + 1cm);
+	}
+	to {
+		top: 0;
+	}
+}
 </style>
 
 <script setup>
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
+import * as storage from "../storage.ts";
+import { eventBus, globalState } from '../state';
+const copyColor = ref("");
+const renderPreview = ref(false);
+const textPreview = ref(null);
+
+function copy(){
+	storage.read().then((data) => {
+		navigator.clipboard.writeText(JSON.stringify(data, null, "\t")).then(() => {
+			copyColor.value = "green";
+			setTimeout(() => {
+				copyColor.value = "";
+			}, 200);
+		});
+	});
+}
+
+function merge(){
+	globalState.dayOpen = true;
+	navigator.clipboard.readText().then((text) => {
+		renderPreview.value = true;
+		nextTick().then(() => {
+			textPreview.value.value = text;
+		})
+	});
+}
+
+function cleanJsonString(jsonString) {
+	// Replace non-breaking spaces and other problematic characters
+	return jsonString.replace(/\u00a0/g, ' '); // Replace non-breaking spaces with regular spaces
+}
+
+function accept(){
+	if(!renderPreview.value) return;
+	try{
+		const cleanedText = cleanJsonString(textPreview.value.value)
+		const data = JSON.parse(cleanedText);
+		storage.merge(data).then(() => {
+			textPreview.value.value = "";
+			renderPreview.value = false;
+			eventBus.emit("updatePreview", {});
+		});
+	}
+	catch{
+		console.error("Could not merge");
+		textPreview.value.value = "";
+		renderPreview.value = false;
+	}
+	globalState.dayOpen = false;
+}
+
+function cancel(){
+	if(!renderPreview.value) return;
+	textPreview.value.value = "";
+	renderPreview.value = false;
+	globalState.dayOpen = false;
+}
 
 function closeApp(){
 	window.ipcRenderer.send("closeApp");
